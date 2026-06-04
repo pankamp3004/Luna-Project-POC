@@ -10,7 +10,7 @@ __pycache__/
 .Python
 build/
 develop-eggs/
-dist/
+
 downloads/
 eggs/
 .eggs/
@@ -216,3 +216,27 @@ __marimo__/
 
 # Streamlit
 .streamlit/secrets.toml
+
+
+attachments/
+
+dashboard/node_modules/
+
+verify_setup.py
+
+test_unit16.py
+
+test_unit_detection.py
+
+test_email_unit16.py
+
+test_pricing.py
+
+start.bat
+
+start_api.py
+
+
+property_data/
+
+data/
