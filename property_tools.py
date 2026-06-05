@@ -301,7 +301,7 @@ def get_unit_availability(
 
 def get_property_link(property_query: str) -> dict:
     """
-    Return the ShowMojo/booking URL and property page URL from property_link_registry.json.
+    Return the schedule_url/booking URL/ShowMojo url and property page URL from property_link_registry.json.
     """
     if not property_query or not property_query.strip():
         return {"error": "No property query provided"}
