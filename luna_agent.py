@@ -299,8 +299,12 @@ Process this email following your workflow. Call tools to get data, then use tha
             _log(f"  Tools used : {tools_called or 'None'}")
             _log(f"  Input tok  : {total_input_tokens:,}")
             _log(f"  Output tok : {total_output_tokens:,}")
-            cost = (total_input_tokens * 3.0 / 1_000_000) + (total_output_tokens * 15.0 / 1_000_000)
+            
+            # Calculate cost using centralized function for accuracy
+            from email_log import calculate_cost as calc_cost
+            cost = calc_cost("claude-sonnet-4-5", total_input_tokens, total_output_tokens)
             _log(f"  Est. cost  : ${cost:.6f}")
+            
             reply_type = (
                 'SKIP' if reply_text == 'SKIP' 
                 else 'ESCALATE' if reply_text == 'ESCALATE'
