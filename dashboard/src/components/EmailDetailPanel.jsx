@@ -39,6 +39,7 @@ const SCENARIO_COLORS = {
 const DECISION_COLORS = {
   SEND:     { bg: '#14362e', text: '#4ade80', label: 'SEND' },
   DRAFT:    { bg: '#2d2a14', text: '#facc15', label: 'DRAFT' },
+  HOLD:     { bg: '#2d1f14', text: '#fb923c', label: 'HOLD' },
   SKIP:     { bg: '#2a2a2a', text: '#94a3b8', label: 'SKIP' },
   ESCALATE: { bg: '#3a1a1a', text: '#f87171', label: 'ESCALATE' },
 }

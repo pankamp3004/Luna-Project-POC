@@ -158,6 +158,15 @@ You'll see:
 }
 ```
 
+**Dashboard Cards:** You'll now see 7 stat cards:
+1. Total Emails
+2. Auto-Sent (green)
+3. Drafts (yellow)
+4. On Hold (orange)
+5. Escalations (red)
+6. Skipped (gray)
+7. AI Cost Total (purple)
+
 ---
 
 ## 🔧 Customization

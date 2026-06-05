@@ -61,19 +61,20 @@ def should_skip(email: InboundEmail) -> bool:
 
 def is_within_business_hours() -> bool:
     """
-    Check if current time is within business hours (Eastern Time).
-    Business hours are configured in .env: SENDING_HOUR_START and SENDING_HOUR_END
-    Default: 8 AM - 8 PM ET
+    Check if current time is within business hours.
+    Business hours are configured in .env: SENDING_HOUR_START, SENDING_HOUR_END, TIMEZONE
+    Default: 8 AM - 8 PM in the configured timezone (default: Asia/Kolkata for India)
     """
     try:
         # Get business hours from .env
         start_hour = int(os.getenv("SENDING_HOUR_START", "8"))
         end_hour = int(os.getenv("SENDING_HOUR_END", "20"))
+        timezone = os.getenv("TIMEZONE", "Asia/Kolkata")  # Default to India timezone
         
-        # Get current time in Eastern Time
-        et_tz = ZoneInfo("America/New_York")
-        now_et = datetime.now(et_tz)
-        current_hour = now_et.hour
+        # Get current time in configured timezone
+        local_tz = ZoneInfo(timezone)
+        now_local = datetime.now(local_tz)
+        current_hour = now_local.hour
         
         # Check if within business hours
         return start_hour <= current_hour < end_hour
@@ -391,7 +392,7 @@ def run(max_emails: int = 5, dry_run: bool = False) -> None:
                 "body_preview": email.body[:200],
                 "scenario": scenario,
                 "classification_method": classification_method,
-                "decision": "DRAFT",
+                "decision": "SKIP",
                 "model_used": model_used,
                 "template_used": template_used,
                 "input_tokens": input_tokens,

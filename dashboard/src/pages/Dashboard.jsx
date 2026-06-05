@@ -9,6 +9,7 @@ import {
   Search,
   RefreshCw,
   Play,
+  XCircle,
 } from 'lucide-react'
 import StatsCard from '../components/StatsCard.jsx'
 import EmailTable from '../components/EmailTable.jsx'
@@ -32,6 +33,7 @@ const STATUS_OPTIONS = [
   { value: 'draft',     label: 'Drafts' },
   { value: 'hold',      label: 'On Hold' },
   { value: 'escalated', label: 'Escalated' },
+  { value: 'skipped',   label: 'Skipped' },
 ]
 
 const INTENT_OPTIONS = [
@@ -178,7 +180,7 @@ export default function Dashboard({ filter: initialFilter = 'all', title = 'Dash
           )}
 
           {/* Stats row */}
-          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-6">
+          <div className="grid grid-cols-2 gap-4 lg:grid-cols-3 xl:grid-cols-7">
             <StatsCard
               icon={Mail}
               title="Total Emails"
@@ -208,6 +210,12 @@ export default function Dashboard({ filter: initialFilter = 'all', title = 'Dash
               title="Escalations"
               value={stats?.escalations ?? '—'}
               color="#ef4444"
+            />
+            <StatsCard
+              icon={XCircle}
+              title="Skipped"
+              value={stats?.skipped ?? '—'}
+              color="#64748b"
             />
             <StatsCard
               icon={DollarSign}
