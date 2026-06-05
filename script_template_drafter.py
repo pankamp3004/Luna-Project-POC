@@ -163,12 +163,15 @@ _TEMPLATE_BANK: Dict[str, Any] = {
 # ---------------------------------------------------------------------------
 
 _POLICY_TEMPLATES: Dict[str, str] = {
+    "apply_now": (
+        "Hi {name} — you can start your application here: {property_page_url}\n\n"
+        "Luna, Tri Star Realty"
+    ),
     "voucher": (
-        "Hi {name}!\n\n"
-        "We do accept vouchers — the main thing to keep in mind is that the "
-        "voucher should match the bedroom count for the unit you're interested in.\n\n"
-        "For questions about your specific situation, Matan is the best person "
-        "to help: matan@tristarrei.com\n\n"
+        "Hi {name} — Absolutely! We gladly accept Vouchers. Just a quick reminder: "
+        "the Voucher should match the number of bedrooms in the property. If you have "
+        "any questions or need assistance, feel free to reach out to Matan at "
+        "matan@tristarrei.com for next steps. Property page: {property_page_url}\n\n"
         "Luna, Tri Star Realty"
     ),
     "income": (
@@ -187,14 +190,9 @@ _POLICY_TEMPLATES: Dict[str, str] = {
         "Luna, Tri Star Realty"
     ),
     "cosigner": (
-        "Hi {name},\n\n"
-        "Co-signers are typically fine — here's what we'd usually need:\n\n"
-        "- A completed rental application from the co-signer\n"
-        "- Proof of income (recent paystubs or tax returns)\n"
-        "- A credit check\n"
-        "- Government-issued ID\n\n"
-        "The co-signer would generally need income around 2.5x the monthly rent.\n\n"
-        "Reply here once you're ready to get started and we'll walk you through it.\n\n"
+        "Hi {name} — yes, cosigners are accepted at {property}. They need to qualify "
+        "with the same income, credit score, and rental history requirements as the "
+        "primary tenant (no evictions). Here are the unit details: {property_page_url}\n\n"
         "Luna, Tri Star Realty"
     ),
     "eviction": (
@@ -206,12 +204,43 @@ _POLICY_TEMPLATES: Dict[str, str] = {
         "Luna, Tri Star Realty"
     ),
     "short_term_lease": (
-        "Hi {name},\n\n"
-        "Our standard lease term is 12 months, so shorter terms are generally "
-        "not available for this property.\n\n"
-        "If your timeline is flexible or you'd like to explore options, reach "
-        "out to Matan at matan@tristarrei.com — otherwise reply here once "
-        "12 months works for you and we'll get you moving.\n\n"
+        "Hi {name} — we don't offer short-term rentals at {property}; our standard "
+        "lease is 12 months. If a 12-month lease works, here are the unit details: "
+        "{property_page_url}\n\n"
+        "Luna, Tri Star Realty"
+    ),
+    "six_month_lease": (
+        "Hi {name} — our standard lease at {property} is 12 months, so a 6-month lease "
+        "isn't something we can offer here. If a 12-month lease works for you, here are "
+        "the unit details and tour booking page: {property_page_url}\n\n"
+        "Luna, Tri Star Realty"
+    ),
+    "month_to_month": (
+        "Hi {name} — we don't offer month-to-month leases at move-in for {property}; "
+        "our standard term is 12 months. If a 12-month lease works, here are the unit "
+        "details: {property_page_url}\n\n"
+        "Luna, Tri Star Realty"
+    ),
+    "eighteen_month_lease": (
+        "Hi {name} — we don't offer 18-month leases at {property}; our standard term is "
+        "12 months with the option to extend at renewal. If a 12-month lease works for you, "
+        "here are the unit details and tour booking page: {property_page_url}\n\n"
+        "Luna, Tri Star Realty"
+    ),
+    "far_future_inquiry": (
+        "Hi {name} — with a move-in date that far out, it is best to treat current "
+        "availability as a reference point only. Inventory changes closer to the move-in "
+        "date, so the best time to re-check live availability is about 30 to 45 days before "
+        "your target move-in.\n\n"
+        "You can review the property page for reference here: {property_page_url}\n\n"
+        "Warm regards,\n"
+        "Luna,\n"
+        "Tri Star Realty\n"
+        "leasing@tristarrei.com"
+    ),
+    "third_party_funding": (
+        "Hi {name} — yes, we do accept third-party funding at {property}. Here are the "
+        "unit details and tour booking page: {property_page_url}\n\n"
         "Luna, Tri Star Realty"
     ),
     "credit": (
@@ -319,6 +348,8 @@ def draft_template_reply(
 def draft_policy_reply(
     topic: str,
     prospect_name: Optional[str] = None,
+    property_address: Optional[str] = None,
+    property_page_url: Optional[str] = None,
 ) -> Optional[Dict[str, Any]]:
     """
     Build a deterministic policy reply for a hard-stop topic.
@@ -330,7 +361,18 @@ def draft_policy_reply(
         return None
 
     name = _first_name(prospect_name)
-    body = template.format(name=name)
+    prop = (property_address or "the property").strip() or "the property"
+    url = (property_page_url or "").strip()
+    
+    # If template needs property_page_url but it's missing, return None
+    if "{property_page_url}" in template and not url:
+        return None
+    
+    body = template.format(
+        name=name,
+        property=prop,
+        property_page_url=url,
+    )
 
     return {
         "body": body,

@@ -150,8 +150,10 @@ STEP 2 — EXTRACT prospect information:
 STEP 3 — DECIDE reply strategy and call tools:
 
 A) TEMPLATE PATH — if scenario is one of these, call use_template immediately:
-   tour_confirm, tour_reschedule, post_tour, voucher, cosigner, short_term_lease,
-   eviction, credit, income, esa, criminal_background, bankruptcy, pet_review
+   tour_confirm, tour_reschedule, post_tour, apply_now, voucher, cosigner,
+   short_term_lease, six_month_lease, month_to_month, eighteen_month_lease,
+   far_future_inquiry, third_party_funding, eviction, credit, income, esa,
+   criminal_background, bankruptcy, pet_review
 
 B) PROPERTY PATH — for new_lead, inquiry_reply, far_future, re_engagement, student_housing:
 
@@ -403,9 +405,15 @@ def _infer_scenario(reply_text: Optional[str], tools_called: list, template_used
             "tour_confirm": "tour_confirm",
             "tour_reschedule": "tour_reschedule",
             "post_tour": "post_tour",
+            "apply_now": "new_lead",
             "voucher": "objection",
             "cosigner": "objection",
             "short_term_lease": "objection",
+            "six_month_lease": "objection",
+            "month_to_month": "objection",
+            "eighteen_month_lease": "objection",
+            "far_future_inquiry": "far_future",
+            "third_party_funding": "objection",
             "eviction": "objection",
             "credit": "objection",
             "income": "objection",

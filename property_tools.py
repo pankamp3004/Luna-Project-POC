@@ -526,9 +526,10 @@ TOOLS = [
         "description": (
             "Use a predefined zero-cost template reply instead of drafting from scratch. "
             "Call this when the scenario matches one of: "
-            "tour_confirm, tour_reschedule, post_tour, voucher, cosigner, "
-            "short_term_lease, eviction, credit, income, esa, criminal_background, "
-            "bankruptcy, pet_review. Prefer templates whenever available."
+            "tour_confirm, tour_reschedule, post_tour, apply_now, voucher, cosigner, "
+            "short_term_lease, six_month_lease, month_to_month, eighteen_month_lease, "
+            "far_future_inquiry, third_party_funding, eviction, credit, income, esa, "
+            "criminal_background, bankruptcy, pet_review. Prefer templates whenever available."
         ),
         "input_schema": {
             "type": "object",
@@ -537,9 +538,11 @@ TOOLS = [
                     "type": "string",
                     "enum": [
                         "tour_confirm", "tour_reschedule", "post_tour",
-                        "voucher", "cosigner", "short_term_lease", "eviction",
-                        "credit", "income", "esa", "criminal_background",
-                        "bankruptcy", "pet_review"
+                        "apply_now", "voucher", "cosigner", "short_term_lease",
+                        "six_month_lease", "month_to_month", "eighteen_month_lease",
+                        "far_future_inquiry", "third_party_funding",
+                        "eviction", "credit", "income", "esa",
+                        "criminal_background", "bankruptcy", "pet_review"
                     ],
                     "description": "Template to use"
                 },
@@ -549,11 +552,15 @@ TOOLS = [
                 },
                 "property_address": {
                     "type": "string",
-                    "description": "Property address (optional, used for tour templates)"
+                    "description": "Property address (optional, used for tour templates and policy templates)"
                 },
                 "booking_url": {
                     "type": "string",
                     "description": "ShowMojo or booking URL (required for tour_confirm and tour_reschedule)"
+                },
+                "property_page_url": {
+                    "type": "string",
+                    "description": "Property page URL (required for most policy templates)"
                 }
             },
             "required": ["template_type", "prospect_name"]
@@ -592,6 +599,7 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
         prospect_name    = tool_input.get("prospect_name", "there")
         property_address = tool_input.get("property_address", "")
         booking_url      = tool_input.get("booking_url", "")
+        property_page_url = tool_input.get("property_page_url", "")
 
         if template_type in ("tour_confirm", "tour_reschedule", "post_tour"):
             draft = draft_template_reply(
@@ -601,7 +609,12 @@ def execute_tool(tool_name: str, tool_input: dict) -> str:
                 booking_url=booking_url or None,
             )
         else:
-            draft = draft_policy_reply(topic=template_type, prospect_name=prospect_name)
+            draft = draft_policy_reply(
+                topic=template_type,
+                prospect_name=prospect_name,
+                property_address=property_address or None,
+                property_page_url=property_page_url or None,
+            )
 
         result = (
             {"template_used": True,  "body": draft["body"]}

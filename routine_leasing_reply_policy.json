@@ -1,0 +1,88 @@
+{
+  "_comment": "Routine-leasing reply policy. Defines safe auto-response templates for common policy questions Luna can answer without escalating. Updated 2026-05-01.",
+  "_format": {
+    "match_inbound_keywords": "regex matched against inbound text (case-insensitive). If matched AND no other escalation guard fires, Luna may auto-send the template.",
+    "auto_send_template": "the body Luna may send. Substitution tokens: {first_name}, {property}, {property_page_url}.",
+    "classification": "AUTO_SEND_WITH_TEMPLATE | SAVE_DRAFT_FOR_FLOR | NEEDS_POLICY_OWNER | HARD_BLOCK",
+    "owner": "flor (for review only) | matan_policy (needs Matan) | isaac_policy (needs Isaac)"
+  },
+  "_principles": [
+    "Escalate ONLY for uncertainty, legal/policy risk, missing facts, unavailable units, broken data, voucher/SOI, unsupported links, or anything requiring owner judgment.",
+    "Routine policy questions with documented answer = auto-respond.",
+    "When in doubt, escalate."
+  ],
+  "_updated_at": "2026-05-02",
+  "application_process": {
+    "apply_now": {
+      "match_inbound_keywords": "(?i)\\b(?:send\\s+(?:me\\s+)?(?:an?\\s+)?application|how\\s+(?:do\\s+i|can\\s+i|to)\\s+apply|i(?:'d|\\s+would)\\s+like\\s+to\\s+move\\s+forward|can\\s+you\\s+send\\s+me\\s+an\\s+application|can\\s+i\\s+apply\\s+now)\\b",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — you can start your application here: {property_page_url}\n\nLuna, Tri Star Realty",
+      "notes": "Use for routine application-path asks. If combined with another routine policy question, this answer should appear first."
+    }
+  },
+  "lease_term_policies": {
+    "six_month_lease_request": {
+      "match_inbound_keywords": "(?i)\\b(6[\\s-]*month|six[\\s-]*month|6[\\s-]*mo\\b|6mo\\b)",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — our standard lease at {property} is 12 months, so a 6-month lease isn't something we can offer here. If a 12-month lease works for you, here are the unit details and tour booking page: {property_page_url}\n\nLuna, Tri Star Realty"
+    },
+    "month_to_month_request": {
+      "match_inbound_keywords": "(?i)\\b(month[\\s-]*to[\\s-]*month|m2m\\b)",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — we don't offer month-to-month leases at move-in for {property}; our standard term is 12 months. If a 12-month lease works, here are the unit details: {property_page_url}\n\nLuna, Tri Star Realty"
+    },
+    "short_term_request": {
+      "match_inbound_keywords": "(?i)\\b(short[\\s-]*term|temporary housing|airbnb|2[\\s-]*month|three[\\s-]*month|3[\\s-]*month|3[\\s-]*mo|90[\\s-]*day)",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — we don't offer short-term rentals at {property}; our standard lease is 12 months. If a 12-month lease works, here are the unit details: {property_page_url}\n\nLuna, Tri Star Realty"
+    },
+    "eighteen_month_request": {
+      "match_inbound_keywords": "(?i)\\b(18[\\s-]*month|eighteen[\\s-]*month|18[\\s-]*mo\\b)",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — we don't offer 18-month leases at {property}; our standard term is 12 months with the option to extend at renewal. If a 12-month lease works for you, here are the unit details and tour booking page: {property_page_url}\n\nLuna, Tri Star Realty",
+      "notes": "Standard lease is 12 months per Isaac 2026-05-02. May extend at renewal."
+    }
+  },
+  "far_future_policies": {
+    "no_hold_info_only": {
+      "match_inbound_keywords": "(?i)(?:move|moving)[\\s-]*in.{0,50}(\\d{4}|aug|sept|oct|nov|dec)",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — with a move-in date that far out, it is best to treat current availability as a reference point only. Inventory changes closer to the move-in date, so the best time to re-check live availability is about 30 to 45 days before your target move-in.\n\nYou can review the property page for reference here: {property_page_url}\n\nWarm regards,\nLuna,\nTri Star Realty\nleasing@tristarrei.com",
+      "notes": "Use ONLY for info-only replies more than 60 days out. Do not include booking or apply CTA language in this template."
+    }
+  },
+  "voucher_soi": {
+    "any_voucher_question": {
+      "match_inbound_keywords": "(?i)\\b(vouchers?|section[\\s-]*8|housing[\\s-]*assistance|HCV|HAP|SOI|source[\\s-]*of[\\s-]*income|rental[\\s-]*assistance|housing[\\s-]*choice|housing[\\s-]*vouchers?|move-in assistance|move-in costs)\\b",
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "auto_send_template": "Hi {first_name} — Absolutely! We gladly accept Vouchers. Just a quick reminder: the Voucher should match the number of bedrooms in the property. If you have any questions or need assistance, feel free to reach out to Matan at matan@tristarrei.com for next steps. Property page: {property_page_url}\n\nLuna, Tri Star Realty",
+      "notes": "Tri Star accepts vouchers per Isaac 2026-05-02."
+    }
+  },
+  "cosigner_policy": {
+    "_comment": "Cosigner policy per Isaac 2026-05-02.",
+    "cosigners_accepted": {
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "match_inbound_keywords": "(?i)\\b(cosign|co-sign|co signer|cosigner|guarantor)\\b",
+      "auto_send_template": "Hi {first_name} — yes, cosigners are accepted at {property}. They need to qualify with the same income, credit score, and rental history requirements as the primary tenant (no evictions). Here are the unit details: {property_page_url}\n\nLuna, Tri Star Realty"
+    }
+  },
+  "third_party_funding": {
+    "_comment": "Third-party funding policy per Isaac 2026-05-03 — same as vouchers.",
+    "any_funding_question": {
+      "classification": "AUTO_SEND_WITH_TEMPLATE",
+      "owner": "flor",
+      "match_inbound_keywords": "(?i)\\b(third.party|3rd.party|outside.funding|external.funding|program.pay|agency.pay|someone.else.pay|organization.pay)\\b",
+      "auto_send_template": "Hi {first_name} — yes, we do accept third-party funding at {property}. Here are the unit details and tour booking page: {property_page_url}\n\nLuna, Tri Star Realty",
+      "notes": "Tri Star accepts third-party funding per Isaac 2026-05-03. Same policy as vouchers."
+    }
+  }
+}
