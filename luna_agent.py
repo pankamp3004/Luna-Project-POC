@@ -210,6 +210,7 @@ Process this email following your workflow. Call tools to get data, then use tha
     total_input_tokens = 0
     total_output_tokens = 0
     tools_called = []
+    tool_results_data = []  # Track actual tool results for DRAFT detection
     template_used = None
 
     max_iterations = 5
@@ -265,7 +266,7 @@ Process this email following your workflow. Call tools to get data, then use tha
                 classification_method = "LLM"
 
             # Check for unverified sensitive facts (DRAFT detection)
-            if _check_unverified_sensitive_facts(reply_text, tools_called):
+            if _check_unverified_sensitive_facts(reply_text, tools_called, tool_results_data):
                 reply_text = f"DRAFT:{reply_text}"  # Prefix with DRAFT marker
 
             scenario = _infer_scenario(reply_text, tools_called, template_used)
@@ -314,6 +315,10 @@ Process this email following your workflow. Call tools to get data, then use tha
 
                     if block.name not in tools_called:
                         tools_called.append(block.name)
+                    
+                    # Store tool result data for DRAFT detection
+                    tool_results_data.append(result_data)
+                    
                     if block.name == "use_template":
                         template_used = block.input.get("template_type")
                         _log(f"[TOOL]  Template selected: {template_used}")
@@ -343,20 +348,29 @@ Process this email following your workflow. Call tools to get data, then use tha
     }
 
 
-def _check_unverified_sensitive_facts(reply_text: str, tools_called: list) -> bool:
+def _check_unverified_sensitive_facts(reply_text: str, tools_called: list, tool_results: list = None) -> bool:
     """
     Check if the reply contains sensitive facts (rent, pricing, deposit) that were NOT
-    verified by tool calls. Returns True if unverified sensitive facts are detected.
+    verified by tool calls, OR if the property mentioned doesn't exist in our data.
+    Returns True if unverified sensitive facts are detected.
     
-    Rule: If the reply mentions rent/pricing but get_unit_availability was NOT called,
-    then it's an unverified fact and should be drafted (DRAFT mode).
+    Rules:
+    1. If the reply mentions rent/pricing but get_unit_availability was NOT called → DRAFT
+    2. If any tool returned found=False (property not in our data) → DRAFT
     """
     if not reply_text or reply_text in ("SKIP", "ESCALATE"):
         return False
     
     reply_lower = reply_text.lower()
     
-    # Patterns indicating rent/pricing information
+    # Rule 2: Check if any tool returned "found: False" (property not in our data)
+    if tool_results:
+        for result in tool_results:
+            if isinstance(result, dict) and result.get("found") is False:
+                _log("[DRAFT] Reply references property not found in our data")
+                return True
+    
+    # Rule 1: Patterns indicating rent/pricing information
     sensitive_patterns = [
         r'\$\d+',  # Dollar amounts
         'rent is', 'rent for', 'rent of', 'monthly rent',

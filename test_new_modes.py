@@ -80,25 +80,29 @@ def test_draft_mode():
     print("="*60)
     
     test_cases = [
-        # (reply_text, tools_called, should_be_draft)
-        ("The rent is $1500/month for this unit.", [], True),
-        ("The rent is $1500/month for this unit.", ["get_unit_availability"], False),
-        ("Security deposit is $2000.", [], True),
-        ("Security deposit is $2000.", ["get_unit_availability"], False),
-        ("Hi! The unit is still available. You can schedule a tour here: [link]", [], False),
-        ("The property is located in Syracuse, NY.", [], False),
+        # (reply_text, tools_called, tool_results, should_be_draft)
+        ("The rent is $1500/month for this unit.", [], None, True),
+        ("The rent is $1500/month for this unit.", ["get_unit_availability"], None, False),
+        ("Security deposit is $2000.", [], None, True),
+        ("Security deposit is $2000.", ["get_unit_availability"], None, False),
+        ("Hi! The unit is still available. You can schedule a tour here: [link]", [], None, False),
+        ("The property is located in Syracuse, NY.", [], None, False),
+        # Test property not found case
+        ("Sorry, we don't have that property.", ["fetch_property_data"], [{"found": False, "message": "Not found"}], True),
+        ("The property is available.", ["fetch_property_data"], [{"found": True, "canonical_name": "Test"}], False),
     ]
     
     passed = 0
     failed = 0
     
-    for reply_text, tools_called, should_be_draft in test_cases:
-        is_draft = _check_unverified_sensitive_facts(reply_text, tools_called)
+    for reply_text, tools_called, tool_results, should_be_draft in test_cases:
+        is_draft = _check_unverified_sensitive_facts(reply_text, tools_called, tool_results)
         
         status = "✓ PASS" if is_draft == should_be_draft else "✗ FAIL"
         print(f"\n{status}")
         print(f"  Reply: {reply_text[:60]}...")
         print(f"  Tools: {tools_called or 'None'}")
+        print(f"  Tool Results: {tool_results if tool_results else 'None'}")
         print(f"  Expected: {'DRAFT' if should_be_draft else 'NOT DRAFT'}")
         print(f"  Got: {'DRAFT' if is_draft else 'NOT DRAFT'}")
         

@@ -107,10 +107,18 @@ def _score_match(query_lower: str, target: str) -> int:
     return sum(1 for w in words if w in target_lower)
 
 
-def _best_property_match(query_lower: str, data: dict) -> Optional[str]:
+def _best_property_match(query_lower: str, data: dict, min_score_threshold: int = 2) -> Optional[str]:
     """
     Find the best-matching property key in `data` (a dict keyed by property name).
     Returns the matching key or None.
+    
+    Args:
+        query_lower: lowercase search query
+        data: dict of properties
+        min_score_threshold: minimum score required (default 2 = at least 2 words match)
+    
+    Returns:
+        Best matching key if score >= threshold, else None
     """
     best_score = 0
     best_key = None
@@ -119,7 +127,11 @@ def _best_property_match(query_lower: str, data: dict) -> Optional[str]:
         if score > best_score:
             best_score = score
             best_key = key
-    return best_key if best_score > 0 else None
+    
+    # Only return match if score meets minimum threshold
+    if best_score >= min_score_threshold:
+        return best_key
+    return None
 
 
 # ---------------------------------------------------------------------------
@@ -323,7 +335,8 @@ def get_property_link(property_query: str) -> dict:
                 best_score  = score
                 best_record = record
 
-    if not best_record:
+    # Require minimum score threshold of 2 (at least 2 words match)
+    if not best_record or best_score < 2:
         return {"found": False, "message": f"No link found for '{property_query}'"}
 
     return {
@@ -347,17 +360,28 @@ def check_property_status(property_query: str) -> dict:
     query_lower = property_query.lower().strip()
 
     # 1 — manual overrides (highest priority: sold properties etc.)
+    best_override_score = 0
+    best_override_key = None
+    best_override_data = None
+    
     for key, override in _load_status_overrides().items():
-        if _score_match(query_lower, key.lower()) > 0:
-            return {
-                "found":         True,
-                "property":      key,
-                "status":        override.get("status", "unknown"),
-                "is_active":     False,
-                "source":        "manual_override",
-                "override_date": override.get("date", ""),
-                "message":       f"Property has a manual status override: {override.get('status', 'unknown')}",
-            }
+        score = _score_match(query_lower, key.lower())
+        if score > best_override_score:
+            best_override_score = score
+            best_override_key = key
+            best_override_data = override
+    
+    # Require minimum score threshold of 2 for overrides
+    if best_override_key and best_override_score >= 2:
+        return {
+            "found":         True,
+            "property":      best_override_key,
+            "status":        best_override_data.get("status", "unknown"),
+            "is_active":     False,
+            "source":        "manual_override",
+            "override_date": best_override_data.get("date", ""),
+            "message":       f"Property has a manual status override: {best_override_data.get('status', 'unknown')}",
+        }
 
     # 2 — Yardi status CSV
     best_score = 0
@@ -373,7 +397,8 @@ def check_property_status(property_query: str) -> dict:
             best_score = score
             best_row   = row
 
-    if not best_row:
+    # Require minimum score threshold of 2
+    if not best_row or best_score < 2:
         return {"found": False, "message": f"No status data found for '{property_query}'"}
 
     yardi_status = best_row.get("yardi_status", "").strip()
