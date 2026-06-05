@@ -161,9 +161,10 @@ def get_stats() -> dict:
 
     total_emails = len(records)
     auto_sent = sum(1 for r in records if r.get("status") == "sent")
-    drafts = sum(1 for r in records if r.get("decision") == "DRAFT")
+    drafts = sum(1 for r in records if r.get("status") == "draft" or r.get("decision") == "DRAFT")
     escalations = sum(1 for r in records if r.get("status") == "escalated")
-    on_hold = sum(1 for r in records if r.get("status") == "skipped" and r.get("decision") == "SKIP")
+    on_hold = sum(1 for r in records if r.get("status") == "hold" or r.get("decision") == "HOLD")
+    skipped = sum(1 for r in records if r.get("status") == "skipped" and r.get("decision") == "SKIP")
     total_cost = sum(float(r.get("ai_cost_usd", 0.0)) for r in records)
     llm_calls = sum(1 for r in records if r.get("classification_method") == "LLM")
     template_calls = sum(1 for r in records if r.get("classification_method") == "Template")
@@ -174,6 +175,7 @@ def get_stats() -> dict:
         "drafts": drafts,
         "escalations": escalations,
         "on_hold": on_hold,
+        "skipped": skipped,
         "total_cost_usd": round(total_cost, 6),
         "llm_calls": llm_calls,
         "template_calls": template_calls,

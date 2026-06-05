@@ -72,9 +72,11 @@ def _filter_by_status(records: list, status: str) -> list:
     if status_lower == "sent":
         return [r for r in records if r.get("status") == "sent"]
     elif status_lower == "draft":
-        return [r for r in records if r.get("decision") == "DRAFT"]
-    elif status_lower == "hold" or status_lower == "skipped":
-        return [r for r in records if r.get("status") == "skipped"]
+        return [r for r in records if r.get("status") == "draft" or r.get("decision") == "DRAFT"]
+    elif status_lower == "hold":
+        return [r for r in records if r.get("status") == "hold" or r.get("decision") == "HOLD"]
+    elif status_lower == "skipped":
+        return [r for r in records if r.get("status") == "skipped" and r.get("decision") == "SKIP"]
     elif status_lower == "escalated":
         return [r for r in records if r.get("status") == "escalated"]
     elif status_lower == "error":
@@ -287,8 +289,9 @@ def stats():
     Response:
         total_emails    — total emails processed
         auto_sent       — emails where status == "sent"
-        drafts          — emails where decision == "DRAFT"
-        on_hold         — emails where status == "skipped"
+        drafts          — emails where status == "draft" or decision == "DRAFT"
+        on_hold         — emails where status == "hold" or decision == "HOLD"
+        skipped         — emails where status == "skipped" and decision == "SKIP"
         escalations     — emails where status == "escalated"
         total_cost_usd  — sum of all ai_cost_usd values
         llm_calls       — count of emails classified by LLM

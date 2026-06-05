@@ -7,9 +7,11 @@ Flow:
   1. Fetch unread emails via IMAP
   2. For each email -> call luna_agent.py (single Claude API call with tools)
   3. Claude classifies, extracts prospect info, calls tools, drafts reply
-  4. Send reply via Gmail SMTP
-  5. Mark original email as read
-  6. Log every processed email to data/email_log.json
+  4. Check business hours - if outside hours, mark as HOLD (saved for later)
+  5. Check for DRAFT prefix - if unverified data, save as DRAFT (no send)
+  6. Send reply via Gmail SMTP (if not HOLD or DRAFT)
+  7. Mark original email as read
+  8. Log every processed email to data/email_log.json
 
 Usage:
     python poc_pipeline.py              # Process up to 5 unread emails
@@ -22,6 +24,7 @@ import sys
 import os
 import uuid
 from datetime import datetime, timezone
+from zoneinfo import ZoneInfo
 from dotenv import load_dotenv
 
 load_dotenv(override=True)  # override=True ensures .env takes priority over system env vars
@@ -54,6 +57,29 @@ def should_skip(email: InboundEmail) -> bool:
     if not email.body.strip():
         return True
     return False
+
+
+def is_within_business_hours() -> bool:
+    """
+    Check if current time is within business hours (Eastern Time).
+    Business hours are configured in .env: SENDING_HOUR_START and SENDING_HOUR_END
+    Default: 8 AM - 8 PM ET
+    """
+    try:
+        # Get business hours from .env
+        start_hour = int(os.getenv("SENDING_HOUR_START", "8"))
+        end_hour = int(os.getenv("SENDING_HOUR_END", "20"))
+        
+        # Get current time in Eastern Time
+        et_tz = ZoneInfo("America/New_York")
+        now_et = datetime.now(et_tz)
+        current_hour = now_et.hour
+        
+        # Check if within business hours
+        return start_hour <= current_hour < end_hour
+    except Exception as e:
+        print(f"  [WARN] Could not check business hours: {e}. Defaulting to allow send.")
+        return True  # Default to allowing sends if we can't check
 
 
 def print_divider(title: str = "") -> None:
@@ -97,6 +123,8 @@ def run(max_emails: int = 5, dry_run: bool = False) -> None:
     processed = 0
     skipped = 0
     escalated = 0
+    drafted = 0
+    on_hold = 0
     errors = 0
 
     for i, email in enumerate(emails, 1):
@@ -270,6 +298,47 @@ def run(max_emails: int = 5, dry_run: bool = False) -> None:
             })
             continue
 
+        # Check for DRAFT prefix (unverified sensitive facts)
+        if reply_body.startswith("DRAFT:"):
+            # Remove DRAFT: prefix for storage
+            clean_reply = reply_body[6:].strip()
+            print()
+            print("  [DRAFT] Reply contains unverified data - saved as draft")
+            print("  " + "-" * 50)
+            for line in clean_reply.split("\n")[:10]:  # Show first 10 lines
+                print(f"  {line}")
+            if len(clean_reply.split("\n")) > 10:
+                print("  ... (truncated)")
+            print("  " + "-" * 50)
+            print()
+            
+            drafted += 1
+            if not dry_run:
+                mark_as_read(email.uid)
+
+            log_email_processing({
+                "id": log_id,
+                "received_at": received_at,
+                "from_addr": email.from_addr,
+                "from_name": email.from_name,
+                "subject": email.subject,
+                "body_preview": email.body[:200],
+                "scenario": scenario,
+                "classification_method": classification_method,
+                "decision": "DRAFT",
+                "model_used": model_used,
+                "template_used": template_used,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "ai_cost_usd": ai_cost,
+                "reply_preview": clean_reply[:300],
+                "full_reply": clean_reply,
+                "tools_called": tools_called,
+                "status": "draft",
+                "error": None,
+            })
+            continue
+
         # Show the generated reply
         print()
         print("  [REPLY GENERATED]")
@@ -278,6 +347,36 @@ def run(max_emails: int = 5, dry_run: bool = False) -> None:
             print(f"  {line}")
         print("  " + "-" * 50)
         print()
+
+        # Check business hours (HOLD logic)
+        if not is_within_business_hours() and not dry_run:
+            print("  [HOLD] Outside business hours - reply saved for later dispatch")
+            print("     Business hours: 8 AM - 8 PM ET")
+            on_hold += 1
+            mark_as_read(email.uid)
+
+            log_email_processing({
+                "id": log_id,
+                "received_at": received_at,
+                "from_addr": email.from_addr,
+                "from_name": email.from_name,
+                "subject": email.subject,
+                "body_preview": email.body[:200],
+                "scenario": scenario,
+                "classification_method": classification_method,
+                "decision": "HOLD",
+                "model_used": model_used,
+                "template_used": template_used,
+                "input_tokens": input_tokens,
+                "output_tokens": output_tokens,
+                "ai_cost_usd": ai_cost,
+                "reply_preview": reply_body[:300],
+                "full_reply": reply_body,
+                "tools_called": tools_called,
+                "status": "hold",
+                "error": None,
+            })
+            continue
 
         if dry_run:
             print("  [DRY RUN] Reply NOT sent (run without --dry-run to send)")
@@ -368,13 +467,19 @@ def run(max_emails: int = 5, dry_run: bool = False) -> None:
     # Summary
     print_divider("Summary")
     print(f"  Total emails  : {len(emails)}")
-    print(f"  Processed     : {processed}")
-    print(f"  Skipped       : {skipped}")
+    print(f"  Sent          : {processed}")
+    print(f"  Drafted       : {drafted}")
+    print(f"  On Hold       : {on_hold}")
     print(f"  Escalated     : {escalated}")
+    print(f"  Skipped       : {skipped}")
     print(f"  Errors        : {errors}")
     if dry_run and processed > 0:
         print()
         print("  NOTE: Dry run mode -- run without --dry-run to actually send replies")
+    if on_hold > 0:
+        print()
+        print(f"  NOTE: {on_hold} email(s) on hold (outside business hours)")
+        print("        These will be dispatched when business hours resume")
     print_divider()
 
 

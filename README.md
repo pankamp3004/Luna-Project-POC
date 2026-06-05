@@ -71,6 +71,10 @@ GMAIL_ADDRESS=pankaj@amplework.in
 GMAIL_APP_PASSWORD=xxxx xxxx xxxx xxxx
 REPLY_FROM_NAME=Luna
 REPLY_FROM_EMAIL=pankaj@amplework.in
+
+# Business hours for sending emails (Eastern Time, 24-hour format)
+SENDING_HOUR_START=8   # 8 AM ET
+SENDING_HOUR_END=20    # 8 PM ET
 ```
 
 ---
@@ -130,6 +134,18 @@ Send these test emails **to your own Gmail** from another account:
 ---
 
 ## Architecture
+
+### Email Processing Modes
+
+Luna POC now supports **5 intelligent processing modes** for safe and accurate email handling:
+
+1. **SKIP** — System/automated emails (noreply@, etc.)
+2. **DRAFT** — Replies with unverified rent/pricing data (saved, not sent)
+3. **ESCALATE** — Hard-stop keywords requiring manual review (legal, application status)
+4. **HOLD** — Outside business hours (8 AM - 8 PM ET)
+5. **SENT** — Verified replies successfully sent
+
+See [MODES_DOCUMENTATION.md](MODES_DOCUMENTATION.md) for detailed information about each mode.
 
 ### Single Claude Call Per Email
 
@@ -215,3 +231,132 @@ pip install -r requirements.txt
 **Reply not sending**
 - Check SMTP credentials are same as IMAP
 - Gmail SMTP uses port 587 with STARTTLS (handled automatically)
+
+
+---
+
+## Testing & Validation
+
+### Run the test suite:
+```bash
+python test_new_modes.py
+```
+
+This validates:
+- ✓ Hard-stop keyword detection (ESCALATE mode)
+- ✓ Unverified sensitive fact detection (DRAFT mode)
+- ✓ Business hours checking (HOLD mode)
+
+### Validate the implementation:
+```bash
+python validate_implementation.py
+```
+
+This checks:
+- All required files are present
+- Imports are working correctly
+- Environment variables are configured
+- Core functions are callable
+
+### Test with real emails (safe mode):
+```bash
+python poc_pipeline.py --dry-run --max 5
+```
+
+This processes real emails but doesn't send any replies, allowing you to see what mode each email would trigger.
+
+---
+
+## New Modes Documentation
+
+For detailed information about the 5 processing modes, see [MODES_DOCUMENTATION.md](MODES_DOCUMENTATION.md).
+
+**Quick reference:**
+- **SKIP** — noreply@ addresses, empty emails → no action
+- **DRAFT** — mentions $rent without calling `get_unit_availability` → saved but not sent
+- **ESCALATE** — contains "lawsuit", "application approved", "waive deposit" → manual review
+- **HOLD** — outside 8 AM - 8 PM ET → saved for business hours
+- **SENT** — verified reply with tools called → successfully sent
+
+---
+
+## Dashboard Statistics
+
+The admin dashboard now tracks all 5 modes separately:
+
+```json
+{
+  "total_emails": 100,
+  "auto_sent": 65,       // SENT mode
+  "drafts": 10,          // DRAFT mode  
+  "on_hold": 8,          // HOLD mode
+  "escalations": 12,     // ESCALATE mode
+  "skipped": 5,          // SKIP mode
+  "total_cost_usd": 2.45
+}
+```
+
+Start the dashboard:
+```bash
+cd api
+uvicorn main:app --reload --port 8000
+```
+
+View stats: http://localhost:8000/api/stats
+
+---
+
+## Configuration Updates
+
+### Business Hours (.env)
+
+Configure when emails should be sent (Eastern Time):
+
+```env
+SENDING_HOUR_START=8   # 8 AM ET (24-hour format: 0-23)
+SENDING_HOUR_END=20    # 8 PM ET (24-hour format: 0-23)
+```
+
+Emails processed outside these hours will be saved with **HOLD** status.
+
+### Hard-Stop Keywords
+
+Edit `luna_agent.py` to customize which keywords trigger **ESCALATE** mode:
+
+```python
+HARD_STOP_KEYWORDS = [
+    "lawsuit", "attorney", "legal notice",
+    "application approved", "application denied",
+    "waive deposit", "rent negotiation",
+    # Add your custom keywords...
+]
+```
+
+---
+
+## Troubleshooting New Modes
+
+**Issue: All emails going to DRAFT**
+- The AI is mentioning rent/pricing without calling `get_unit_availability`
+- This is correct behavior - it prevents sending unverified data
+- Check Claude's prompts ensure tool usage instructions are clear
+
+**Issue: HOLD not triggering**
+- Verify `.env` has `SENDING_HOUR_START` and `SENDING_HOUR_END` set
+- Check your system can detect Eastern Time (requires `zoneinfo` / `tzdata`)
+- Run `python test_new_modes.py` to verify business hours logic
+
+**Issue: ESCALATE too sensitive**
+- Review `HARD_STOP_KEYWORDS` list in `luna_agent.py`
+- Remove overly broad keywords that match normal inquiries
+- Keywords are case-insensitive and match substrings
+
+**Issue: Dashboard stats not updating**
+- Restart FastAPI: `uvicorn api.main:app --reload --port 8000`
+- Check `data/email_log.json` exists and is being written
+- Clear browser cache and refresh
+
+**Issue: "No module named 'zoneinfo'"**
+- Windows Python < 3.9 may need: `pip install tzdata`
+- Or update to Python 3.9+
+

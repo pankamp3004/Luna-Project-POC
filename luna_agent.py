@@ -21,6 +21,30 @@ from gmail_client import InboundEmail
 
 load_dotenv(override=True)
 
+# Hard-stop keywords (escalate, don't auto-reply)
+HARD_STOP_KEYWORDS = [
+    # Legal/safety
+    "voice message", "voicemail", "eviction", "evict", "legal notice", 
+    "lease termination", "lease renewal", "lawsuit", "attorney", "complaint",
+    "discrimination", "fair housing",
+    
+    # Financial/pricing disputes
+    "deposit refund", "waive deposit", "waive the deposit", "reduce deposit",
+    "lower deposit", "deposit back", "return deposit", "refund",
+    "concession", "waive", "lower the rent", "reduce the rent", 
+    "negotiate the rent", "rent negotiation", "rent too high", "price too high",
+    
+    # Application outcomes
+    "application approved", "application denied", "was i approved", "am i approved",
+    "did i get approved", "approval status", "was my application approved",
+    "application status", "deny my application", "why was i denied",
+    "why was my application denied",
+    
+    # Fee waivers
+    "waive the fee", "waive application fee", "waive my fee",
+    "first month free", "free month", "no deposit",
+]
+
 # Load SOUL.md once at startup
 _SOUL_PATH = Path(__file__).parent / "SOUL.md"
 _SOUL_CONTENT = _SOUL_PATH.read_text(encoding="utf-8") if _SOUL_PATH.exists() else ""
@@ -48,11 +72,38 @@ def _log(msg: str) -> None:
     print(f"  {msg}")
 
 
+def _check_hard_stop(email_body: str, email_subject: str) -> bool:
+    """
+    Check if the email contains any hard-stop keywords that require escalation.
+    Returns True if a hard-stop keyword is found.
+    """
+    combined_text = f"{email_subject} {email_body}".lower()
+    for keyword in HARD_STOP_KEYWORDS:
+        if keyword.lower() in combined_text:
+            _log(f"[HARD-STOP] Detected keyword: '{keyword}'")
+            return True
+    return False
+
+
 def process_email(email: InboundEmail) -> dict:
     """
     Process one inbound email using a single Claude API call with tools.
     Returns a dict with reply, scenario, tokens, cost info.
     """
+
+    # Check for hard-stop keywords BEFORE calling Claude
+    if _check_hard_stop(email.body, email.subject):
+        _log("[ESCALATE] Hard-stop keyword detected. Manual review required.")
+        return {
+            "reply": "ESCALATE",
+            "scenario": "escalated",
+            "classification_method": "Rule",
+            "model_used": "—",
+            "template_used": None,
+            "input_tokens": 0,
+            "output_tokens": 0,
+            "tools_called": [],
+        }
 
     # Validate API key
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
@@ -213,6 +264,10 @@ Process this email following your workflow. Call tools to get data, then use tha
             if reply_text in ("SKIP", "ESCALATE"):
                 classification_method = "LLM"
 
+            # Check for unverified sensitive facts (DRAFT detection)
+            if _check_unverified_sensitive_facts(reply_text, tools_called):
+                reply_text = f"DRAFT:{reply_text}"  # Prefix with DRAFT marker
+
             scenario = _infer_scenario(reply_text, tools_called, template_used)
 
             # Log: Final result summary
@@ -226,7 +281,13 @@ Process this email following your workflow. Call tools to get data, then use tha
             _log(f"  Output tok : {total_output_tokens:,}")
             cost = (total_input_tokens * 3.0 / 1_000_000) + (total_output_tokens * 15.0 / 1_000_000)
             _log(f"  Est. cost  : ${cost:.6f}")
-            _log(f"  Reply type : {'SKIP' if reply_text == 'SKIP' else 'ESCALATE' if reply_text == 'ESCALATE' else 'Email reply'}")
+            reply_type = (
+                'SKIP' if reply_text == 'SKIP' 
+                else 'ESCALATE' if reply_text == 'ESCALATE'
+                else 'DRAFT (unverified data)' if reply_text and reply_text.startswith('DRAFT:')
+                else 'Email reply'
+            )
+            _log(f"  Reply type : {reply_type}")
             _log(_SEP)
 
             return {
@@ -280,6 +341,42 @@ Process this email following your workflow. Call tools to get data, then use tha
         "output_tokens": total_output_tokens,
         "tools_called": tools_called,
     }
+
+
+def _check_unverified_sensitive_facts(reply_text: str, tools_called: list) -> bool:
+    """
+    Check if the reply contains sensitive facts (rent, pricing, deposit) that were NOT
+    verified by tool calls. Returns True if unverified sensitive facts are detected.
+    
+    Rule: If the reply mentions rent/pricing but get_unit_availability was NOT called,
+    then it's an unverified fact and should be drafted (DRAFT mode).
+    """
+    if not reply_text or reply_text in ("SKIP", "ESCALATE"):
+        return False
+    
+    reply_lower = reply_text.lower()
+    
+    # Patterns indicating rent/pricing information
+    sensitive_patterns = [
+        r'\$\d+',  # Dollar amounts
+        'rent is', 'rent for', 'rent of', 'monthly rent',
+        'deposit is', 'deposit of', 'security deposit',
+        'pricing', 'price is', 'costs', 'cost is',
+    ]
+    
+    import re
+    has_sensitive_info = any(
+        re.search(pattern, reply_lower) if pattern.startswith(r'\$') 
+        else pattern in reply_lower
+        for pattern in sensitive_patterns
+    )
+    
+    # If reply contains sensitive info but get_unit_availability was NOT called, it's unverified
+    if has_sensitive_info and "get_unit_availability" not in tools_called:
+        _log("[DRAFT] Reply contains unverified sensitive facts (rent/pricing without tool verification)")
+        return True
+    
+    return False
 
 
 def _infer_scenario(reply_text: Optional[str], tools_called: list, template_used: Optional[str]) -> str:
