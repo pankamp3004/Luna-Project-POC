@@ -149,11 +149,28 @@ STEP 2 — EXTRACT prospect information:
 
 STEP 3 — DECIDE reply strategy and call tools:
 
-A) TEMPLATE PATH — if scenario is one of these, call use_template immediately:
-   tour_confirm, tour_reschedule, post_tour, apply_now, voucher, cosigner,
-   short_term_lease, six_month_lease, month_to_month, eighteen_month_lease,
-   far_future_inquiry, third_party_funding, eviction, credit, income, esa,
-   criminal_background, bankruptcy, pet_review
+A) TEMPLATE PATH — if scenario is one of these, use the template immediately:
+   
+   **POLICY TEMPLATES (need property_page_url):**
+   apply_now, voucher, cosigner, short_term_lease, six_month_lease, month_to_month,
+   eighteen_month_lease, far_future_inquiry, third_party_funding
+   
+   → ONLY call get_property_link(property_query=<address>) to get property_page_url
+   → Then call use_template with template_type, prospect_name, property_address, property_page_url
+   → Return the template body as-is. Do not call any other tools. Do not modify or draft further.
+   
+   **SIMPLE TEMPLATES (no property needed):**
+   eviction, credit, income, esa, criminal_background, bankruptcy, pet_review
+   
+   → Call use_template immediately with just template_type and prospect_name
+   → Return the template body as-is. Do not call any other tools. Do not modify or draft further.
+   
+   **SHOWING TEMPLATES (need booking_url):**
+   tour_confirm, tour_reschedule, post_tour
+   
+   → ONLY call get_property_link(property_query=<address>) to get schedule_url
+   → Then call use_template with template_type, prospect_name, property_address, booking_url
+   → Return the template body as-is. Do not call any other tools. Do not modify or draft further.
 
 B) PROPERTY PATH — for new_lead, inquiry_reply, far_future, re_engagement, student_housing:
 
