@@ -199,60 +199,77 @@ STEP 2 — EXTRACT prospect information:
 - Prospect email address
 - Property they are asking about (if mentioned)
 
-STEP 3 — DECIDE reply strategy and call tools:
+STEP 3 — DECIDE reply strategy and call ALL needed tools IN PARALLEL (single tool_use response):
 
-A) TEMPLATE PATH — if scenario is one of these, use the template immediately:
+⚡ PARALLEL TOOL CALLING RULE: Always call ALL required tools in a SINGLE response.
+   Never call one tool, wait for the result, then call another.
+   Call get_property_link AND use_template together in the same response.
+   Call get_unit_availability AND get_property_link together in the same response.
+
+A) TEMPLATE PATH — if scenario is one of these:
    
    **POLICY TEMPLATES (need property_page_url):**
    apply_now, voucher, cosigner, short_term_lease, six_month_lease, month_to_month,
    eighteen_month_lease, far_future_inquiry
    
-   → ONLY call get_property_link(property_query=<address>) to get property_page_url
-   → Then call use_template with template_type, prospect_name, property_address, property_page_url
+   → Call BOTH tools in ONE response simultaneously:
+      • get_property_link(property_query=<address>)
+      • use_template(template_type=<type>, prospect_name=<name>, property_address=<address>, property_page_url="PENDING")
+   → The system will inject the real URL from get_property_link into use_template automatically.
    → Return the template body as-is. Do not call any other tools. Do not modify or draft further.
    
    **SIMPLE TEMPLATES (no property needed):**
    eviction, credit, income, esa, criminal_background, bankruptcy, pet_review
    
-   → Call use_template immediately with just template_type and prospect_name
-   → Return the template body as-is. Do not call any other tools. Do not modify or draft further.
+   → Call use_template immediately (single tool call is fine here — no URL needed).
+   → Return the template body as-is. Do not call any other tools.
    
    **SHOWING TEMPLATES (need booking_url):**
    tour_confirm, tour_reschedule, post_tour
    
-   → ONLY call get_property_link(property_query=<address>) to get schedule_url
-   → Then call use_template with template_type, prospect_name, property_address, booking_url
-   → Return the template body as-is. Do not call any other tools. Do not modify or draft further.
+   → Call BOTH tools in ONE response simultaneously:
+      • get_property_link(property_query=<address>)
+      • use_template(template_type=<type>, prospect_name=<name>, property_address=<address>, booking_url="PENDING")
+   → The system will inject the real booking URL automatically.
+   → Return the template body as-is. Do not call any other tools.
 
 B) PROPERTY PATH — for new_lead, inquiry_reply, far_future, re_engagement, student_housing:
    
    **🚫 CRITICAL RULE: DO NOT CALL get_unit_availability UNLESS EXPLICITLY ASKED 🚫**
    
-   BEFORE calling get_unit_availability, ask yourself: "Did they ask about rent, pricing, or availability?"
+   BEFORE calling get_unit_availability, ask yourself: "Did the PROSPECT (not the platform) ask about rent or availability?"
    
-   You may ONLY call get_unit_availability if the prospect's email explicitly contains:
+   You may ONLY call get_unit_availability if the prospect's OWN message contains:
    ✓ "how much is rent" / "what's the rent" / "rent price" / "cost"
    ✓ "is it available" / "when available" / "availability"
-   ✓ "how many bedrooms" / "unit details" / "square feet"
-   ✓ Specific unit number mentioned (e.g., "Unit 16")
+   ✓ Specific unit number mentioned by the prospect (e.g., "I want Unit 16")
+   
+   ⚠️ PLATFORM EMAILS (RentCafe, Zillow, Apartments.com, etc.):
+   These emails contain metadata fields like "Beds: Studio", "Rent budget: $950", "Move-in date: ..."
+   This is NOT the prospect asking about pricing — it is platform-generated data.
+   For platform emails where the prospect just says "I like it" or "contact me" or "I want to move here"
+   → DO NOT call get_unit_availability
+   → ONLY call get_property_link
+   
+   ⚠️ GENERAL INTEREST PHRASES — these are NOT pricing questions:
+   "discuss details", "details about moving", "moving details", "more details",
+   "discuss moving", "talk about", "learn more", "find out more", "interested in"
+   These mean the prospect wants general info — NOT rent, pricing, or unit specs.
+   → DO NOT call get_unit_availability for these phrases
+   → ONLY call get_property_link
    
    DO NOT call get_unit_availability if they only ask about:
    ✗ Policy questions (vouchers, pets, rental assistance, lease terms, third-party funding)
    ✗ Tours / showings / viewing / scheduling
    ✗ Application process ("how do I apply", "send me an application")
-   ✗ General information ("tell me about this property")
+   ✗ General interest ("I like it", "contact me", "I want to move here")
    
    🔴 SPECIAL CASE - RENTAL ASSISTANCE / THIRD-PARTY FUNDING:
    If they ask "Do you accept [vouchers/rapid rehousing/subsidies]?" → ONLY call get_property_link
    DO NOT call get_unit_availability unless they ALSO ask about rent/pricing
    
-   If NO pricing/unit questions asked → ONLY call get_property_link for the link, NOTHING ELSE
-   
-   **FOR QUESTIONS ABOUT UNITS, RENT, OR AVAILABILITY:**
-   
-   → ONLY call get_unit_availability if prospect explicitly asked about rent, pricing, availability, or unit details
-   → If a specific unit number is mentioned, use get_unit_availability(property_query=<address>, unit="<unit_number>")
-   → Call get_property_link if you need schedule_url/booking URL or property page URL
+   → If pricing asked: call get_unit_availability AND get_property_link IN THE SAME RESPONSE
+   → If only link needed: call get_property_link alone
    → Call fetch_property_data ONLY if you need property location (city, state, zip)
    → Call check_property_status ONLY if get_unit_availability returns found=False
 
@@ -456,20 +473,85 @@ FOLLOW THE FAR-FUTURE POLICY:
         elif response.stop_reason == "tool_use":
             messages.append({"role": "assistant", "content": response.content})
 
-            tool_results = []
-            for block in response.content:
-                if block.type == "tool_use":
+            # Collect all tool_use blocks first (Claude may call multiple tools in parallel)
+            tool_use_blocks = [b for b in response.content if b.type == "tool_use"]
+
+            # --- PARALLEL TOOL INJECTION ---
+            # If Claude calls get_property_link AND use_template together,
+            # we need to run get_property_link first, then inject the real URL
+            # into the use_template call before executing it.
+            prop_link_result: Optional[dict] = None
+            prop_link_block = next((b for b in tool_use_blocks if b.name == "get_property_link"), None)
+            use_tmpl_block  = next((b for b in tool_use_blocks if b.name == "use_template"), None)
+
+            if prop_link_block and use_tmpl_block:
+                # Execute get_property_link first to get the real URL
+                link_result_str  = execute_tool("get_property_link", prop_link_block.input)
+                prop_link_result = json.loads(link_result_str)
+                _log(f"[TOOL]  Claude calling (parallel): get_property_link({json.dumps(prop_link_block.input)[:60]})")
+                _log(f"[TOOL]  Result: {str(prop_link_result)[:120]}")
+                if "get_property_link" not in tools_called:
+                    tools_called.append("get_property_link")
+                tool_results_data.append(prop_link_result)
+
+                # Inject real URL into use_template inputs before executing
+                tmpl_input = dict(use_tmpl_block.input)
+                real_page_url    = prop_link_result.get("property_page_url", "")
+                real_schedule_url = prop_link_result.get("schedule_url", "") or prop_link_result.get("showmojo_url", "")
+
+                # Replace PENDING placeholders with real URLs
+                if tmpl_input.get("property_page_url") in ("PENDING", "", None):
+                    tmpl_input["property_page_url"] = real_page_url
+                if tmpl_input.get("booking_url") in ("PENDING", "", None):
+                    tmpl_input["booking_url"] = real_schedule_url or real_page_url
+
+                _log(f"[TOOL]  Claude calling (parallel): use_template({json.dumps(tmpl_input)[:80]})")
+                tmpl_result_str  = execute_tool("use_template", tmpl_input)
+                tmpl_result_data = json.loads(tmpl_result_str)
+                _log(f"[TOOL]  Result: {str(tmpl_result_data)[:120]}")
+                if "use_template" not in tools_called:
+                    tools_called.append("use_template")
+                tool_results_data.append(tmpl_result_data)
+                if tmpl_input.get("template_type"):
+                    template_used = tmpl_input["template_type"]
+                    _log(f"[TOOL]  Template selected: {template_used}")
+
+                # Build tool_results for both blocks
+                tool_results = [
+                    {"type": "tool_result", "tool_use_id": prop_link_block.id, "content": link_result_str},
+                    {"type": "tool_result", "tool_use_id": use_tmpl_block.id,  "content": tmpl_result_str},
+                ]
+
+                # Handle any remaining tool blocks (unlikely but safe)
+                for block in tool_use_blocks:
+                    if block.name in ("get_property_link", "use_template"):
+                        continue
                     _log(f"[TOOL]  Claude calling: {block.name}({json.dumps(block.input)[:80]})")
-                    result_str = execute_tool(block.name, block.input)
+                    result_str  = execute_tool(block.name, block.input)
+                    result_data = json.loads(result_str)
+                    _log(f"[TOOL]  Result: {str(result_data)[:120]}")
+                    if block.name not in tools_called:
+                        tools_called.append(block.name)
+                    tool_results_data.append(result_data)
+                    tool_results.append({
+                        "type": "tool_result",
+                        "tool_use_id": block.id,
+                        "content": result_str,
+                    })
+
+            else:
+                # Normal path: execute all tool blocks as-is
+                tool_results = []
+                for block in tool_use_blocks:
+                    _log(f"[TOOL]  Claude calling: {block.name}({json.dumps(block.input)[:80]})")
+                    result_str  = execute_tool(block.name, block.input)
                     result_data = json.loads(result_str)
                     _log(f"[TOOL]  Result: {str(result_data)[:120]}")
 
                     if block.name not in tools_called:
                         tools_called.append(block.name)
-                    
-                    # Store tool result data for DRAFT detection
                     tool_results_data.append(result_data)
-                    
+
                     if block.name == "use_template":
                         template_used = block.input.get("template_type")
                         _log(f"[TOOL]  Template selected: {template_used}")
