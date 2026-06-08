@@ -244,7 +244,9 @@ function ReplyPreviewTab({ email }) {
     setSending(true)
     setSendStatus(null)
     try {
-      const res = await fetch(`http://127.0.0.1:8000/api/emails/${email.id}/send`, {
+      // const res = await fetch(`http://127.0.0.1:8000/api/emails/${email.id}/send`, {
+      const res = await fetch(`http://52.45.229.96:8000/api/emails/${email.id}/send`, {
+
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ body: textToSend }),

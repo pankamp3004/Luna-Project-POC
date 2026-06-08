@@ -3,7 +3,8 @@
  * All data comes from the FastAPI backend at http://localhost:8000.
  */
 
-const BASE = 'http://127.0.0.1:8000'
+// const BASE = 'http://127.0.0.1:8000'
+const BASE = 'http://52.45.229.96:8000'
 
 /**
  * Fetch a paginated list of email log entries.
