@@ -451,10 +451,16 @@ function DetailsTab({ email }) {
       {/* Body preview */}
       <Section title="Email Body Preview" icon={Mail}>
         <div
-          className="text-xs leading-relaxed"
-          style={{ color: '#94a3b8', fontFamily: 'monospace', whiteSpace: 'pre-wrap' }}
+          className="text-xs leading-relaxed overflow-y-auto"
+          style={{ 
+            color: '#94a3b8', 
+            fontFamily: 'monospace', 
+            whiteSpace: 'pre-wrap',
+            maxHeight: '300px',
+            overflowY: 'auto'
+          }}
         >
-          {email.body_preview || '—'}
+          {email.full_body || email.body_preview || '—'}
         </div>
       </Section>
     </div>

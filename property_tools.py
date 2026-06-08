@@ -453,18 +453,22 @@ TOOLS = [
         "description": (
             "**PRIMARY DATA SOURCE** - Get real-time unit data from Yardi property management system.\n"
             "Returns: rent, deposit, beds, baths, sqft, availability status for units.\n\n"
-            "**WHEN TO USE THIS TOOL:**\n"
-            "✓ Prospect asks about a specific unit number\n"
+            "**🚫 BEFORE CALLING - CHECK IF THEY ASKED ABOUT PRICING/AVAILABILITY 🚫**\n\n"
+            "**ONLY USE THIS TOOL IF:**\n"
+            "✓ Prospect asks about a specific unit number (e.g., \"Unit 16\")\n"
             "✓ Prospect asks \"how much is rent?\" or \"what's the price?\"\n"
             "✓ Prospect asks \"is it available?\" or \"when can I move in?\"\n"
-            "✓ Prospect asks about bedrooms, bathrooms, or square footage\n"
-            "✓ ANY question about unit details, pricing, or availability\n\n"
+            "✓ Prospect asks about bedrooms, bathrooms, or square footage\n\n"
+            "**DO NOT USE THIS TOOL IF:**\n"
+            "✗ Prospect only asks about policy (vouchers, rental assistance, pets, lease terms)\n"
+            "✗ Prospect only asks about tours/showings/application process\n"
+            "✗ Prospect only asks \"Do you accept [vouchers/rapid rehousing/subsidies]?\"\n\n"
             "**USAGE:**\n"
             "- If unit number mentioned: call with unit parameter\n"
             "- Returns 'requested_unit' with exact details for that unit\n"
             "- Also returns 'available_now' and 'available_soon' lists\n\n"
-            "**CRITICAL:** Always use this tool for unit/pricing questions. "
-            "The data is accurate and current. Do not say \"I don't have details\" - call this tool to get them."
+            "**IMPORTANT:** This tool is for pricing/availability questions ONLY. "
+            "For policy questions without pricing questions, use get_property_link instead."
         ),
         "input_schema": {
             "type": "object",
@@ -528,7 +532,7 @@ TOOLS = [
             "Call this when the scenario matches one of: "
             "tour_confirm, tour_reschedule, post_tour, apply_now, voucher, cosigner, "
             "short_term_lease, six_month_lease, month_to_month, eighteen_month_lease, "
-            "far_future_inquiry, third_party_funding, eviction, credit, income, esa, "
+            "far_future_inquiry, eviction, credit, income, esa, "
             "criminal_background, bankruptcy, pet_review. Prefer templates whenever available."
         ),
         "input_schema": {
@@ -540,7 +544,7 @@ TOOLS = [
                         "tour_confirm", "tour_reschedule", "post_tour",
                         "apply_now", "voucher", "cosigner", "short_term_lease",
                         "six_month_lease", "month_to_month", "eighteen_month_lease",
-                        "far_future_inquiry", "third_party_funding",
+                        "far_future_inquiry",
                         "eviction", "credit", "income", "esa",
                         "criminal_background", "bankruptcy", "pet_review"
                     ],

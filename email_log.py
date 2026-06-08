@@ -102,6 +102,7 @@ def log_email_processing(record: dict) -> None:
         "from_name": record.get("from_name", ""),
         "subject": record.get("subject", ""),
         "body_preview": record.get("body_preview", "")[:200],
+        "full_body": record.get("full_body", ""),  # Store complete email body
         "scenario": record.get("scenario", "unknown"),
         "classification_method": record.get("classification_method", "LLM"),
         "decision": record.get("decision", "SKIP"),

@@ -18,6 +18,7 @@ from dotenv import load_dotenv
 
 from property_tools import TOOLS, execute_tool
 from gmail_client import InboundEmail
+from move_in_date_policy import parse_move_in_date, is_far_future_move_in, FAR_FUTURE_THRESHOLD_DAYS
 
 load_dotenv(override=True)
 
@@ -105,6 +106,14 @@ def process_email(email: InboundEmail) -> dict:
             "tools_called": [],
         }
 
+    # Check for far-future move-in date BEFORE calling Claude
+    combined_text = f"{email.subject} {email.body}"
+    move_in_date = parse_move_in_date(combined_text)
+    is_far_future = is_far_future_move_in(combined_text)
+    
+    if is_far_future and move_in_date:
+        _log(f"[FAR-FUTURE] Move-in date detected: {move_in_date} (more than {FAR_FUTURE_THRESHOLD_DAYS} days away)")
+
     # Validate API key
     api_key = os.getenv("ANTHROPIC_API_KEY", "").strip()
     if not api_key:
@@ -123,6 +132,49 @@ def process_email(email: InboundEmail) -> dict:
     system_prompt = f"""You are Luna, a professional leasing assistant for a property management company.
 
 {_SOUL_CONTENT}
+
+---
+
+MOVE-IN DATE POLICY:
+- If the prospect mentions a move-in date MORE THAN {FAR_FUTURE_THRESHOLD_DAYS} days away:
+  * DO NOT provide direct booking links (ShowMojo links)
+  * DO NOT say "schedule a tour here" or give property_page_url
+  * DO NOT call get_property_link or provide any links
+  * INSTEAD, say: "We're a bit early for scheduling since your move-in is [date]. Reach out about 30-45 days before your target move-in and we'll get you set up."
+  * Keep the tone helpful, not dismissive
+  * Classify as: far_future scenario
+  * DO NOT provide rent, pricing, or unit details
+  
+- If move-in is WITHIN {FAR_FUTURE_THRESHOLD_DAYS} days or no move-in date mentioned:
+  * Normal process - provide booking links as usual
+  * Call tools and provide information normally
+  * Classify as: new_lead or inquiry_reply (depending on context)
+
+---
+
+THIRD-PARTY FUNDING / RENTAL ASSISTANCE POLICY:
+
+🚨 CRITICAL: DO NOT call get_unit_availability for rental assistance questions 🚨
+
+We accept ALL forms of third-party rental assistance:
+- Section 8 vouchers
+- Rapid Rehousing
+- Rental subsidies  
+- Agency payments
+- Organizational funding
+
+WHEN PROSPECT ASKS ABOUT RENTAL ASSISTANCE / THIRD-PARTY FUNDING:
+1. Acknowledge the specific program they mentioned (e.g., "yes, we accept Rapid Rehousing")
+2. Include: "For program-specific details or paperwork requirements, reach out to Matan at matan@tristarrei.com"
+3. ONLY call get_property_link to provide the property page link
+4. DO NOT call get_unit_availability UNLESS they also ask about rent/pricing/availability
+
+Examples:
+- "Do you accept rental subsidies?" → ONLY call get_property_link
+- "I have a Rapid Rehousing voucher" → ONLY call get_property_link  
+- "Do you take third-party funding and how much is rent?" → call BOTH tools
+
+Keep tone professional and helpful
 
 ---
 
@@ -153,7 +205,7 @@ A) TEMPLATE PATH — if scenario is one of these, use the template immediately:
    
    **POLICY TEMPLATES (need property_page_url):**
    apply_now, voucher, cosigner, short_term_lease, six_month_lease, month_to_month,
-   eighteen_month_lease, far_future_inquiry, third_party_funding
+   eighteen_month_lease, far_future_inquiry
    
    → ONLY call get_property_link(property_query=<address>) to get property_page_url
    → Then call use_template with template_type, prospect_name, property_address, property_page_url
@@ -174,32 +226,28 @@ A) TEMPLATE PATH — if scenario is one of these, use the template immediately:
 
 B) PROPERTY PATH — for new_lead, inquiry_reply, far_future, re_engagement, student_housing:
    
-   **CRITICAL: Only call tools for data the prospect EXPLICITLY asked about.**
+   **🚫 CRITICAL RULE: DO NOT CALL get_unit_availability UNLESS EXPLICITLY ASKED 🚫**
    
-   DO NOT call get_unit_availability unless the prospect asked about:
-   - Rent amount / pricing / cost
-   - Availability / "is it available"
-   - Unit details / bedrooms / bathrooms / square footage
-   - Specific unit number
+   BEFORE calling get_unit_availability, ask yourself: "Did they ask about rent, pricing, or availability?"
    
-   If prospect ONLY asks for:
-   - Application → Just call get_property_link for application URL, do NOT call get_unit_availability
-   - Tour/showing → Just call get_property_link for booking URL, do NOT call get_unit_availability
-   - General inquiry → Just call get_property_link for property page, do NOT call get_unit_availability
-
-   **CRITICAL: Only call tools for data the prospect EXPLICITLY asked about.**
+   You may ONLY call get_unit_availability if the prospect's email explicitly contains:
+   ✓ "how much is rent" / "what's the rent" / "rent price" / "cost"
+   ✓ "is it available" / "when available" / "availability"
+   ✓ "how many bedrooms" / "unit details" / "square feet"
+   ✓ Specific unit number mentioned (e.g., "Unit 16")
    
-   DO NOT call get_unit_availability unless the prospect asked about:
-   - Rent amount / pricing / cost
-   - Availability / "is it available"
-   - Unit details / bedrooms / bathrooms / square footage
-   - Specific unit number
+   DO NOT call get_unit_availability if they only ask about:
+   ✗ Policy questions (vouchers, pets, rental assistance, lease terms, third-party funding)
+   ✗ Tours / showings / viewing / scheduling
+   ✗ Application process ("how do I apply", "send me an application")
+   ✗ General information ("tell me about this property")
    
-   If prospect ONLY asks for:
-   - Application → Just call get_property_link for application URL, do NOT call get_unit_availability
-   - Tour/showing → Just call get_property_link for booking URL, do NOT call get_unit_availability
-   - General inquiry → Just call get_property_link for property page, do NOT call get_unit_availability
-
+   🔴 SPECIAL CASE - RENTAL ASSISTANCE / THIRD-PARTY FUNDING:
+   If they ask "Do you accept [vouchers/rapid rehousing/subsidies]?" → ONLY call get_property_link
+   DO NOT call get_unit_availability unless they ALSO ask about rent/pricing
+   
+   If NO pricing/unit questions asked → ONLY call get_property_link for the link, NOTHING ELSE
+   
    **FOR QUESTIONS ABOUT UNITS, RENT, OR AVAILABILITY:**
    
    → ONLY call get_unit_availability if prospect explicitly asked about rent, pricing, availability, or unit details
@@ -270,8 +318,29 @@ Body:
 
 ---
 
-Process this email following your workflow. Call tools to get data, then use that data to write your final reply.
 """
+    
+    # Add far-future move-in context if detected
+    if is_far_future and move_in_date:
+        from datetime import datetime
+        from zoneinfo import ZoneInfo
+        today = datetime.now(ZoneInfo("America/New_York")).date()
+        days_away = (move_in_date - today).days
+        
+        user_message += f"""⚠️ FAR-FUTURE MOVE-IN DETECTED:
+The prospect mentioned a move-in date of {move_in_date.strftime('%B %d, %Y')}, which is {days_away} days away (more than {FAR_FUTURE_THRESHOLD_DAYS} days).
+
+FOLLOW THE FAR-FUTURE POLICY:
+- DO NOT provide booking links or call get_property_link
+- DO NOT provide pricing or unit details  
+- Tell them to reach out 30-45 days before their move-in date
+- Keep the tone helpful and professional
+
+---
+
+"""
+    
+    user_message += "Process this email following your workflow. Call tools to get data, then use that data to write your final reply.\n"
 
     messages = [{"role": "user", "content": user_message}]
 
@@ -493,7 +562,6 @@ def _infer_scenario(reply_text: Optional[str], tools_called: list, template_used
             "month_to_month": "objection",
             "eighteen_month_lease": "objection",
             "far_future_inquiry": "far_future",
-            "third_party_funding": "objection",
             "eviction": "objection",
             "credit": "objection",
             "income": "objection",
