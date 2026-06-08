@@ -114,8 +114,12 @@ function Avatar({ name, email }) {
 
 function formatModelName(model) {
   if (!model || model === '—' || model === '— (No LLM)') return '— (No LLM)'
-  if (model.includes('sonnet')) return 'Claude Sonnet 4.5'
-  if (model.includes('haiku')) return 'Claude Haiku 4.5'
+  // Combined format: "Sonnet 4.5 + Haiku 4.5" or "Sonnet 4.5 × 2" — already readable
+  if (model.includes('+') || model.includes('×')) return model
+  // Raw API model names (fallback for old log entries)
+  if (model.includes('sonnet')) return 'Sonnet 4.5'
+  if (model.includes('haiku')) return 'Haiku 4.5'
+  if (model.includes('opus')) return 'Opus 4'
   return model
 }
 
@@ -320,7 +324,7 @@ export default function EmailTable({
 
                   {/* Model Used */}
                   <td className="px-4 py-3">
-                    <span style={{ color: '#94a3b8', fontSize: '12px' }}>
+                    <span style={{ color: '#94a3b8', fontSize: '12px', whiteSpace: 'nowrap' }}>
                       {formatModelName(email.model_used)}
                     </span>
                   </td>

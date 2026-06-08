@@ -207,14 +207,16 @@ def run(max_emails: int = 5, dry_run: bool = False) -> None:
         reply_body = result.get("reply") if result else None
         scenario = result.get("scenario", "unknown") if result else "unknown"
         classification_method = result.get("classification_method", "LLM") if result else "LLM"
-        model_used = result.get("model_used", "claude-sonnet-4-5") if result else "claude-sonnet-4-5"
+        model_used = result.get("model_used", "claude-haiku-4-5") if result else "claude-haiku-4-5"
         template_used = result.get("template_used") if result else None
         input_tokens = result.get("input_tokens", 0) if result else 0
         output_tokens = result.get("output_tokens", 0) if result else 0
         tools_called = result.get("tools_called", []) if result else []
 
-        # Calculate cost
-        ai_cost = calculate_cost(model_used, input_tokens, output_tokens)
+        # Use pre-calculated cost from luna_agent (accurate mixed-model rates)
+        # Falls back to calculate_cost only if not provided (e.g. error paths)
+        ai_cost = result.get("ai_cost_usd") if result and result.get("ai_cost_usd") is not None \
+                  else calculate_cost(model_used, input_tokens, output_tokens)
 
         if reply_body is None:
             print("  [WARN] No reply generated (agent returned None)")

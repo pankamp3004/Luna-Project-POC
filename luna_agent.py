@@ -322,6 +322,10 @@ CRITICAL RULES:
 - ALWAYS sign off as: Luna, Tri Star Realty
 - If the scenario is logistical_other or the email is clearly spam → return exactly: SKIP
 - If it is a hard-stop situation (legal threat, eviction notice, lease termination, discrimination complaint) → return exactly: ESCALATE
+
+⚠️ PLATFORM SUBJECT PREFIXES — do NOT misclassify these:
+- "[Luna commercial lead]" — this is a RentCafe platform notification for a RESIDENTIAL leasing lead. "Commercial" here means the lead came via a commercial platform/channel, NOT that it is a commercial real estate inquiry. Treat as new_lead.
+- "[Luna lead]", "[Rental lead]", "[Prospect inquiry]" — all residential leasing leads. Treat as new_lead.
 """
 
     user_message = f"""INBOUND EMAIL:
@@ -364,7 +368,6 @@ FOLLOW THE FAR-FUTURE POLICY:
     # Log: About to call Claude
     _log(_SEP)
     _log("[CLAUDE CALL] Sending request to Anthropic API...")
-    _log(f"  Model    : claude-sonnet-4-5")
     _log(f"  API key  : {api_key[:14]}...{api_key[-4:]}")
     _log(f"  Tools    : {[t['name'] for t in TOOLS]}")
     _log(f"  SOUL.md  : {len(_SOUL_CONTENT)} chars loaded")
@@ -376,6 +379,36 @@ FOLLOW THE FAR-FUTURE POLICY:
     tools_called = []
     tool_results_data = []  # Track actual tool results for DRAFT detection
     template_used = None
+    _iter_costs: list = []  # [(model, input_tokens, output_tokens)] per iteration
+
+    # Model routing — inspired by lane_router.py concept:
+    # Iteration 1: Sonnet (tool selection must be reliable — parallel calling, correct tool choice)
+    # Iteration 2: Chosen AFTER we know what Iter 1 decided:
+    #   - Template used → Haiku (just echoes pre-written text, no creativity needed)
+    #   - Only get_property_link → Haiku (simple 2-sentence reply with a link)
+    #   - get_unit_availability called → Sonnet (must write factually with correct tone)
+    #   - far_future detected → Haiku (short, no links, templated phrasing)
+    # NOTE: Iter 1 stays on Sonnet because Haiku struggles with parallel tool calling
+    # instructions and leaks reasoning text into replies. Iter 2 is where savings are.
+    MODEL_ITER1  = "claude-sonnet-4-5"  # tool selection — needs reliable parallel calling
+    MODEL_SONNET = "claude-sonnet-4-5"  # AI-drafted replies with data — quality needed
+    MODEL_HAIKU  = "claude-haiku-4-5"   # template echo + simple replies — cheap
+
+    def _pick_model_for_iter2() -> str:
+        """Pick model for Iteration 2 based on what Iteration 1 decided.
+        
+        Only use Haiku when the output is guaranteed to be simple:
+        - Template echo: Claude just reads the template body and returns it — no writing
+        - All other cases: Sonnet (writing quality and instruction-following matters)
+        """
+        # Template was confirmed used → Iter 2 just reads and returns template text
+        # Haiku is sufficient for this — it's not generating anything new
+        if template_used:
+            return MODEL_HAIKU
+        # All other cases (AI-drafted reply, unit data, general inquiry) → Sonnet
+        # Haiku leaks reasoning text into replies and doesn't follow format instructions
+        # reliably enough for customer-facing emails
+        return MODEL_SONNET
 
     max_iterations = 5
     iteration = 0
@@ -384,9 +417,13 @@ FOLLOW THE FAR-FUTURE POLICY:
         iteration += 1
         _log(f"[CLAUDE] Iteration {iteration} — waiting for response...")
 
+        # Pick model: Iter 1 always Haiku, Iter 2+ based on what Iter 1 decided
+        current_model = MODEL_ITER1 if iteration == 1 else _pick_model_for_iter2()
+        _log(f"[CLAUDE] Model: {current_model}")
+
         try:
             response = client.messages.create(
-                model="claude-sonnet-4-5",
+                model=current_model,
                 max_tokens=2048,
                 system=system_prompt,
                 tools=TOOLS,
@@ -413,7 +450,9 @@ FOLLOW THE FAR-FUTURE POLICY:
             iter_output = getattr(response.usage, "output_tokens", 0)
             total_input_tokens += iter_input
             total_output_tokens += iter_output
+            _iter_costs.append((current_model, iter_input, iter_output))
             _log(f"[CLAUDE] Response received | stop_reason={response.stop_reason}")
+            _log(f"         Model this iteration : {current_model}")
             _log(f"         Tokens this iteration: input={iter_input}, output={iter_output}")
             _log(f"         Tokens cumulative    : input={total_input_tokens}, output={total_output_tokens}")
 
@@ -425,7 +464,20 @@ FOLLOW THE FAR-FUTURE POLICY:
                     break
 
             classification_method = "Template" if template_used else "LLM"
-            model_used = "claude-sonnet-4-5"
+            # Build a readable model string showing both iterations
+            # e.g. "Sonnet 4.5 + Haiku 4.5" (iter1 + iter2) or just "Sonnet 4.5" if same
+            def _short(m):
+                if not m: return "—"
+                if "sonnet" in m: return "Sonnet 4.5"
+                if "haiku"  in m: return "Haiku 4.5"
+                if "opus"   in m: return "Opus 4"
+                return m
+            iter1_model = MODEL_ITER1
+            iter2_model = current_model
+            if iter1_model == iter2_model:
+                model_used = f"{_short(iter1_model)} × 2"
+            else:
+                model_used = f"{_short(iter1_model)} + {_short(iter2_model)}"
             if reply_text in ("SKIP", "ESCALATE"):
                 classification_method = "LLM"
 
@@ -445,10 +497,10 @@ FOLLOW THE FAR-FUTURE POLICY:
             _log(f"  Input tok  : {total_input_tokens:,}")
             _log(f"  Output tok : {total_output_tokens:,}")
             
-            # Calculate cost using centralized function for accuracy
+            # Calculate cost using per-iteration model rates (accurate mixed-model costing)
             from email_log import calculate_cost as calc_cost
-            cost = calc_cost("claude-sonnet-4-5", total_input_tokens, total_output_tokens)
-            _log(f"  Est. cost  : ${cost:.6f}")
+            cost = sum(calc_cost(m, i, o) for m, i, o in _iter_costs)
+            _log(f"  Est. cost  : ${cost:.6f}  (iter1={MODEL_ITER1}, iter2={current_model})")
             
             reply_type = (
                 'SKIP' if reply_text == 'SKIP' 
@@ -468,6 +520,7 @@ FOLLOW THE FAR-FUTURE POLICY:
                 "input_tokens": total_input_tokens,
                 "output_tokens": total_output_tokens,
                 "tools_called": tools_called,
+                "ai_cost_usd": cost,  # pre-calculated with per-iteration model rates
             }
 
         elif response.stop_reason == "tool_use":
