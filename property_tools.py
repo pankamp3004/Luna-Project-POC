@@ -17,7 +17,7 @@ from typing import Optional
 BASE = Path(__file__).parent / "property_data"
 MASTER_CSV        = BASE / "luna_property_master.csv"
 REGISTRY_JSON     = BASE / "property_link_registry.json"
-YARDI_UNITS_JSON  = BASE / "YARDI_UNITS.json"          # structured JSON — single source of truth
+YARDI_UNITS_JSON  = BASE / "YARDI_UNITS.json"         
 YARDI_STATUS_CSV  = BASE / "luna_yardi_property_status.csv"
 STATUS_OVERRIDES  = BASE / "luna_property_status_overrides.json"
 
