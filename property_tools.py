@@ -453,7 +453,7 @@ TOOLS = [
         "description": (
             "**PRIMARY DATA SOURCE** - Get real-time unit data from Yardi property management system.\n"
             "Returns: rent, deposit, beds, baths, sqft, availability status for units.\n\n"
-            "**🚫 BEFORE CALLING - CHECK IF THE PROSPECT (not the platform) ASKED ABOUT PRICING 🚫**\n\n"
+            "**BEFORE CALLING - CHECK IF THE PROSPECT (not the platform) ASKED ABOUT PRICING 🚫**\n\n"
             "**ONLY USE THIS TOOL IF the prospect's own message contains:**\n"
             "✓ Prospect asks \"how much is rent?\" or \"what's the price?\"\n"
             "✓ Prospect asks \"is it available?\" or \"when can I move in?\"\n"
