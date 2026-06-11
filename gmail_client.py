@@ -170,10 +170,10 @@ def send_reply(
             server.starttls(context=context)
             server.login(gmail_addr, app_password)
             server.sendmail(gmail_addr, to_addr, msg.as_string())
-        print(f"  ✅ Reply sent to: {to_addr}")
+        print(f"  Reply sent to: {to_addr}")
         return True
     except Exception as e:
-        print(f"  ❌ Failed to send reply: {e}")
+        print(f"  Failed to send reply: {e}")
         return False
 
 

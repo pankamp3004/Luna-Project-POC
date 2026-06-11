@@ -509,3 +509,5 @@ if __name__ == "__main__":
     args = parser.parse_args()
 
     run(max_emails=args.max, dry_run=args.dry_run)
+
+# it's the compelte pipeline of the luna agent, which includes fetching emails, processing them with the agent, and sending replies. The code is structured to handle various scenarios like skipping certain emails, holding replies outside business hours, and logging all actions for analysis.

@@ -22,12 +22,12 @@ LOG_FILE = DATA_DIR / "email_log.json"
 # Cost rates per million tokens (USD)
 COST_RATES = {
     "claude-sonnet-4-5": {
-        "input": 3.00 / 1_000_000,    # $3.00 per MTok
-        "output": 15.00 / 1_000_000,  # $15.00 per MTok
+        "input": 3.00 / 1_000_000,    
+        "output": 15.00 / 1_000_000, 
     },
     "claude-haiku": {
-        "input": 0.80 / 1_000_000,    # $0.80 per MTok
-        "output": 4.00 / 1_000_000,   # $4.00 per MTok
+        "input": 0.80 / 1_000_000,   
+        "output": 4.00 / 1_000_000,   
     },
     # Also handle full model name variants
     "claude-haiku-4-5": {

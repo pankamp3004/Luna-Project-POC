@@ -1,3 +1,4 @@
+# it's a complete flow of the project for the other developer
 # Luna POC — Leasing Email Automation
 
 A working proof-of-concept that replicates the core Luna leasing assistant
