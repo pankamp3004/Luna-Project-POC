@@ -184,6 +184,7 @@ YOUR WORKFLOW:
 3. CALL the tools to get data (you can call multiple tools)
 4. USE the actual data from tool results to write your final reply
 
+
 When you call a tool, wait for its result before continuing. Never make up information - only use what tools return.
 
 ---
@@ -201,7 +202,7 @@ STEP 2 — EXTRACT prospect information:
 
 STEP 3 — DECIDE reply strategy and call ALL needed tools IN PARALLEL (single tool_use response):
 
-⚡ PARALLEL TOOL CALLING RULE: Always call ALL required tools in a SINGLE response.
+   PARALLEL TOOL CALLING RULE: Always call ALL required tools in a SINGLE response.
    Never call one tool, wait for the result, then call another.
    Call get_property_link AND use_template together in the same response.
    Call get_unit_availability AND get_property_link together in the same response.
