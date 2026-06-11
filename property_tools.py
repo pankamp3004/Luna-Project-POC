@@ -17,7 +17,7 @@ from typing import Optional
 BASE = Path(__file__).parent / "property_data"
 MASTER_CSV        = BASE / "luna_property_master.csv"
 REGISTRY_JSON     = BASE / "property_link_registry.json"
-YARDI_UNITS_JSON  = BASE / "YARDI_UNITS.json"          # structured JSON — single source of truth
+YARDI_UNITS_JSON  = BASE / "YARDI_UNITS.json"         
 YARDI_STATUS_CSV  = BASE / "luna_yardi_property_status.csv"
 STATUS_OVERRIDES  = BASE / "luna_property_status_overrides.json"
 
@@ -453,7 +453,7 @@ TOOLS = [
         "description": (
             "**PRIMARY DATA SOURCE** - Get real-time unit data from Yardi property management system.\n"
             "Returns: rent, deposit, beds, baths, sqft, availability status for units.\n\n"
-            "**🚫 BEFORE CALLING - CHECK IF THE PROSPECT (not the platform) ASKED ABOUT PRICING 🚫**\n\n"
+            "**BEFORE CALLING - CHECK IF THE PROSPECT (not the platform) ASKED ABOUT PRICING 🚫**\n\n"
             "**ONLY USE THIS TOOL IF the prospect's own message contains:**\n"
             "✓ Prospect asks \"how much is rent?\" or \"what's the price?\"\n"
             "✓ Prospect asks \"is it available?\" or \"when can I move in?\"\n"
